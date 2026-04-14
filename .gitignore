@@ -6,6 +6,12 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
+# Storage and example database
+*.db
+data/
+example/
+*.key
+
 # Dependency directories
 node_modules/
 jspm_packages/
@@ -23,3 +29,4 @@ web_modules/
 .env
 .env.*
 !.env.example
+data/storage.db
