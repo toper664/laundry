@@ -37,7 +37,7 @@ export const manualSim = async (req: Request, res: Response): Promise<Response> 
     if (duration) {
       setTimeout(async () => {
         try {
-          await axios.post(`http://localhost:${config.PORT}/simulator/control`, { machine_id, action: 'stop' });
+          await axios.post(`http://${config.IP_ADDR}:${config.PORT}/simulator/control`, { machine_id, action: 'stop' });
         } catch {}
       }, duration * 1000);
     }
@@ -97,5 +97,8 @@ export const autoSim = async (req: Request, res: Response): Promise<Response> =>
     }
   }
 
-  res.json({ success: true, message: `${results.length} actions triggered`, details: results });
-});
+  return res.status(200).json({
+    success: true,
+    message: `${results.length} actions triggered`,
+    details: results });
+};

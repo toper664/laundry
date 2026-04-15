@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import {  } from './simulator.controller.ts';
+import { manualSim, autoSim } from './simulator.controller.ts';
 
 const router = Router();
 
-router.post('/control', );
-router.post('/auto', );
+router.post('/control', manualSim);
+router.post('/auto', autoSim);
 
 export default router;
