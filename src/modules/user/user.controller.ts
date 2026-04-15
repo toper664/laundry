@@ -1,5 +1,5 @@
 import { type Request, type Response } from 'express';
-import { User } from '../../models/user.ts';
+import { User } from './user.ts';
 import { AppDataSource } from '../../config/database.ts';
 
 const userRepository = AppDataSource.getRepository(User);

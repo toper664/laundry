@@ -3,18 +3,16 @@ import bcrypt from 'bcrypt';
 import { z } from 'zod';
 import { verifyRefreshToken, generateAccessToken, generateRefreshToken } from '../../utils/jwt.ts';
 import { AppDataSource } from '../../config/database.ts';
-import { User } from '../../models/user.ts';
+import { UserRepository } from '../user/user.queries.ts';
 import { registerSchema, loginSchema } from './auth.schema.ts';
 
-const userRepository = AppDataSource.getRepository(User);
+const repo = new UserRepository(AppDataSource);
 const SALT_ROUNDS = 12;
-
-type RegisterBody = z.infer<typeof registerSchema>;
 
 type LoginBody = z.infer<typeof loginSchema>;
 
 export const register = async (
-  req: Request<{}, {}, RegisterBody>,
+  req: Request<{}, {}, LoginBody>,
   res: Response
 ): Promise<Response> => {
   try { 
@@ -27,13 +25,12 @@ export const register = async (
       });
     }
 
-    const { username, email, password } = result.data;
+    const { username, password } = result.data;
 
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
-    const user = userRepository.create({
+    const user = repo.create({
       username,
-      email,
       password: hashedPassword
     });
 
@@ -46,7 +43,7 @@ export const register = async (
     const refreshToken = generateRefreshToken(payload);
 
     user.refreshToken = refreshToken;
-    await userRepository.save(user);
+    await repo.save(user);
 
     return res.status(201).cookie('jwt', refreshToken, {
       httpOnly: true,
@@ -58,7 +55,6 @@ export const register = async (
       user: {
         id: user.id,
         username: user.username,
-        email: user.email
       },
       accessToken,
     });
@@ -86,7 +82,7 @@ export const login = async (
     
     const { username, password } = result.data;
 
-    const user = await userRepository.findOneBy({ username });
+    const user = await repo.findByUsername(username);
 
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
@@ -106,7 +102,7 @@ export const login = async (
     const accessToken = generateAccessToken(payload);
     const refreshToken = generateRefreshToken(payload);
 
-    userRepository.update({ id: payload.userId }, { refreshToken: refreshToken });
+    repo.update(payload.userId, { refreshToken: refreshToken });
 
     return res.cookie('jwt', refreshToken, {
       httpOnly: true,
@@ -146,7 +142,7 @@ export const refresh = async (req: Request, res: Response) => {
       username: payload.username,
     });
 
-    userRepository.update({ id: payload.userId }, { refreshToken: newRefreshToken });
+    await repo.update(payload.userId, { refreshToken: newRefreshToken });
 
     return res.cookie('jwt', newRefreshToken, {
       httpOnly: true,
@@ -159,5 +155,24 @@ export const refresh = async (req: Request, res: Response) => {
     });
   } catch (err) {
     return res.status(401).json({ error: 'Invalid refresh token' });
+  }
+};
+
+export const logout = async (req: Request, res: Response) => {
+  try {
+    const refreshToken = req.cookies.refreshToken;
+
+    if (refreshToken) {
+      const user = await repo.findByRefreshToken(refreshToken);
+      if (user) {
+        await repo.update(user.id, { refreshToken: null });
+      }
+      else {
+        return res.status(401).json({ error: 'Invalid refresh token' });
+      }
+    }
+    return res.status(200).clearCookie('jwt').json({ message: 'Logged out' });
+  } catch (err) {
+    return res.status(400).json({ error: 'Bad request' });
   }
 };

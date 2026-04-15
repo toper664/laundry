@@ -28,7 +28,7 @@ export const check = (
 
   if (type !== 'Bearer' || !token) {
     return res
-      .status(401)
+      .status(400)
       .json({ error: 'Invalid authorization format' });
   }
 
@@ -41,6 +41,6 @@ export const check = (
 
     return next();
   } catch (err) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    return res.status(403).json({ error: 'Invalid or expired token' });
   }
 };
