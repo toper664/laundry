@@ -1,13 +1,12 @@
 import { Router } from 'express';
-import { getWifiStatus, updateESP32 } from './api.controller.ts';
+import esp32Routes from '../esp32/esp32.routes.ts';
+import { getWifiStatus } from './api.controller.ts';
 
 const router = Router();
 
-// router.get('/status', getAllUsers);
-// router.get('/command', );
 // router.get('/notifs', );
 router.get('/wifi', getWifiStatus);
-router.post('/esp32', updateESP32);
+router.use('/esp32', esp32Routes);
 // router.get('/sessions', );
 
 export default router;

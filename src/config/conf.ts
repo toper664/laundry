@@ -1,8 +1,7 @@
 import dotenv from 'dotenv';
 import * as fs from 'fs';
-import * as path from 'path';
 
-dotenv.config({ path: path.resolve(__dirname, './config/.env') });
+dotenv.config({ path: process.cwd() + '/src/config/.env'});
 const f = fs.readFileSync(process.cwd() + process.env.PATH_TO_PRIVATE_KEY, 'utf-8').split('\n');
 const key = f.slice(1, -1).join('');
 export const config = {

@@ -10,8 +10,7 @@ import { check } from './middlewares/isAuth.ts';
 import { hasRole, hasPerm } from './middlewares/checkPerm.ts';
 import authRoutes from './modules/auth/auth.routes.ts';
 import userRoutes from './modules/user/user.routes.ts';
-import { settings } from 'cluster';
-import { profile } from 'console';
+import apiRoutes from './modules/api/api.routes.ts';
 
 const app = express();
 
@@ -56,7 +55,7 @@ app.use('/auth', authRoutes);
 app.use(check);
 app.use('/users', hasRole('admin'), userRoutes);
 // app.use('/', dashboardRoutes);
-// app.use('/api', apiRoutes);
+app.use('/api', apiRoutes);
 // app.use('/settings', settingsRoutes);
 // app.use('/profile', profileRoutes);
 // app.use('/devices', deviceRoutes);

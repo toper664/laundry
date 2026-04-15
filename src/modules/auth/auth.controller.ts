@@ -16,7 +16,7 @@ export const register = async (
   res: Response
 ): Promise<Response> => {
   try { 
-    const result = registerSchema.safeParse(req.body);
+    const result = loginSchema.safeParse(req.body);
 
     if (!result.success) {
       return res.status(400).json({

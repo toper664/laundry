@@ -20,7 +20,7 @@ export const manualSim = async (req: Request, res: Response): Promise<Response> 
 
   const existingSession = await sessionRepo.findRunningByDevice(machine_id);
 
-  if (action === 'start') {
+  if (action === 'START') {
     if (existingSession) return res.json({ success: false, message: 'Machine already running' });
 
     const session = sessionRepo.create({
@@ -49,7 +49,7 @@ export const manualSim = async (req: Request, res: Response): Promise<Response> 
         start_time_jakarta: formatJakartaTime(session.startTime) });
   }
 
-  if (action === 'stop') {
+  if (action === 'STOP') {
     if (!existingSession) return res.status(400).json({ success: false, message: 'Machine not running' });
     const endTime = new Date();
     const durationSeconds = (endTime.getTime() - existingSession.startTime.getTime()) / 1000;
@@ -86,12 +86,12 @@ export const autoSim = async (req: Request, res: Response): Promise<Response> =>
     const isRunning = await sessionRepo.findRunningByDevice(machine.id);
     if (!isRunning && Math.random() > 0.7) {
       try {
-        await axios.post(`http://${config.IP_ADDR}:${config.PORT}/simulator/control`, { machine_id: machine.id, action: 'start' });
+        await axios.post(`http://${config.IP_ADDR}:${config.PORT}/simulator/control`, { machine_id: machine.id, action: 'START' });
         results.push(`${machine.name} started`);
       } catch {}
     } else if (isRunning && Math.random() > 0.8) {
       try {
-        await axios.post(`http://${config.IP_ADDR}:${config.PORT}/simulator/control`, { machine_id: machine.id, action: 'stop' });
+        await axios.post(`http://${config.IP_ADDR}:${config.PORT}/simulator/control`, { machine_id: machine.id, action: 'STOP' });
         results.push(`${machine.name} stopped`);
       } catch {}
     }
