@@ -2,10 +2,15 @@ import dotenv from 'dotenv';
 import * as fs from 'fs';
 
 dotenv.config({ path: process.cwd() + '/src/config/.env'});
-const f = fs.readFileSync(process.cwd() + process.env.PATH_TO_PRIVATE_KEY, 'utf-8').split('\n');
-const key = f.slice(1, -1).join('');
+const akey = fs.readFileSync(process.cwd() + process.env.PATH_TO_ACCESS_KEY, 'utf-8');
+const apub = fs.readFileSync(process.cwd() + process.env.PATH_TO_ACCESS_KEY_PUB, 'utf-8');
+const rkey = fs.readFileSync(process.cwd() + process.env.PATH_TO_REFRESH_KEY, 'utf-8');
+const rpub = fs.readFileSync(process.cwd() + process.env.PATH_TO_REFRESH_KEY_PUB, 'utf-8');
 export const config = {
-  SECRET_KEY: key,
+  ACCESS_KEY: akey,
+  ACCESS_KEY_PUB: apub,
+  REFRESH_KEY: rkey,
+  REFRESH_KEY_PUB: rpub,
   DATABASE_PATH: process.env.DATABASE_PATH,
   PERMANENT_SESSION_LIFETIME: parseInt(process.env.PERMANENT_SESSION_LIFETIME || '3600'),
   DEFAULT_ADMIN_USERNAME: process.env.DEFAULT_ADMIN_USERNAME,

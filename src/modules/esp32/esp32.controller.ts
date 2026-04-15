@@ -10,7 +10,11 @@ const commandQueues = new Map(); // device_id -> array of commands
 const deviceStatus = new Map();  // device_id -> last data
 
 export const getStatus = (req: Request, res: Response): Response => {
-    const { device_id } = req.params;
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).send('Missing device_id');
+    }
+    const device_id = Number(id);
     const status = deviceStatus.get(device_id);
 
     if (!status) {
@@ -30,7 +34,11 @@ export const getAllStatus = (req: Request, res: Response): Response => {
 };
 
 export const getQueue = (req: Request, res: Response): Response => {
-    const { device_id } = req.params;
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).send('Missing device_id');
+    }
+    const device_id = Number(id);
     const queue = commandQueues.get(device_id) || [];
     
     return res.status(200).json({

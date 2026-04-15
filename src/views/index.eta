@@ -1,0 +1,995 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Real-time Status Alert Container -->
+<div id="status-alerts" class="fixed top-20 right-4 z-40 flex flex-col gap-2 pointer-events-none"></div>
+
+<!-- SIMULATION PANEL (Tampil hanya untuk admin/developer) -->
+{% if current_user.is_admin() %}
+<div class="simulation-panel rounded-2xl p-5 mb-6 border-2 border-dashed border-blue-500/50 bg-gradient-to-br from-blue-900/20 to-slate-900/50">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold text-blue-400 flex items-center gap-2">
+            <i class="fas fa-flask"></i>
+            SIMULATION MODE (No ESP32 Required)
+        </h3>
+        <span class="px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-xs font-mono">DEV ONLY</span>
+    </div>
+    
+    <!-- ============================================ -->
+    <!-- DRYER SIMULATION (DI ATAS) -->
+    <!-- ============================================ -->
+    <div class="mb-4">
+        <h4 class="text-sm font-semibold text-orange-400 mb-2 flex items-center gap-2">
+            <i class="fas fa-wind"></i> Dryer Simulation
+        </h4>
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {% for machine in machines if machine.type == 'dryer' %}
+            <div class="machine-card bg-slate-800/50 rounded-xl p-3 border border-slate-700 transition-all duration-300" 
+                 data-machine-id="{{ machine.id }}" 
+                 data-status="{{ machine.status }}"
+                 data-type="dryer">
+                <div class="text-xs text-orange-400 mb-2 font-medium flex items-center gap-1">
+                    <i class="fas fa-wind"></i> {{ machine.name }}
+                </div>
+                <div class="flex gap-2">
+                    <button data-machine-id="{{ machine.id }}" data-action="start"
+                            class="sim-control-btn flex-1 bg-emerald-600/80 hover:bg-emerald-500 text-white text-xs py-2 rounded-lg transition-all flex items-center justify-center gap-1">
+                        <i class="fas fa-play"></i> START
+                    </button>
+                    <button data-machine-id="{{ machine.id }}" data-action="stop"
+                            class="sim-control-btn flex-1 bg-red-600/80 hover:bg-red-500 text-white text-xs py-2 rounded-lg transition-all flex items-center justify-center gap-1">
+                        <i class="fas fa-stop"></i> STOP
+                    </button>
+                </div>
+                <div class="mt-2 flex items-center justify-between">
+                    <span id="sim-status-{{ machine.id }}" class="machine-status text-xs font-mono font-bold 
+                        {% if machine.status == 'running' %}text-green-400 animate-pulse
+                        {% elif machine.status == 'standby' %}text-blue-400
+                        {% else %}text-gray-500{% endif %}">
+                        {% if machine.status == 'running' %}🟢 RUNNING
+                        {% elif machine.status == 'standby' %}⚪ STANDBY
+                        {% else %}⚪ STANDBY{% endif %}
+                    </span>
+                    <span class="machine-amp text-xs text-slate-500">{{ "%.2f"|format(machine.current_amp) }} A</span>
+                </div>
+                <div class="last-update text-[10px] text-slate-600 mt-1">Update: -</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- ============================================ -->
+    <!-- WASHER SIMULATION (DI BAWAH DRYER) -->
+    <!-- ============================================ -->
+    <div class="mb-4">
+        <h4 class="text-sm font-semibold text-blue-400 mb-2 flex items-center gap-2">
+            <i class="fas fa-water"></i> Washer Simulation
+        </h4>
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {% for machine in machines if machine.type == 'washer' %}
+            <div class="machine-card bg-slate-800/50 rounded-xl p-3 border border-slate-700 transition-all duration-300" 
+                 data-machine-id="{{ machine.id }}" 
+                 data-status="{{ machine.status }}"
+                 data-type="washer">
+                <div class="text-xs text-blue-400 mb-2 font-medium flex items-center gap-1">
+                    <i class="fas fa-water"></i> {{ machine.name }}
+                </div>
+                <div class="flex gap-2">
+                    <button data-machine-id="{{ machine.id }}" data-action="start"
+                            class="sim-control-btn flex-1 bg-emerald-600/80 hover:bg-emerald-500 text-white text-xs py-2 rounded-lg transition-all flex items-center justify-center gap-1">
+                        <i class="fas fa-play"></i> START
+                    </button>
+                    <button data-machine-id="{{ machine.id }}" data-action="stop"
+                            class="sim-control-btn flex-1 bg-red-600/80 hover:bg-red-500 text-white text-xs py-2 rounded-lg transition-all flex items-center justify-center gap-1">
+                        <i class="fas fa-stop"></i> STOP
+                    </button>
+                </div>
+                <div class="mt-2 flex items-center justify-between">
+                    <span id="sim-status-{{ machine.id }}" class="machine-status text-xs font-mono font-bold 
+                        {% if machine.status == 'running' %}text-green-400 animate-pulse
+                        {% elif machine.status == 'standby' %}text-blue-400
+                        {% else %}text-gray-500{% endif %}">
+                        {% if machine.status == 'running' %}🟢 RUNNING
+                        {% elif machine.status == 'standby' %}⚪ STANDBY
+                        {% else %}⚪ STANDBY{% endif %}
+                    </span>
+                    <span class="machine-amp text-xs text-slate-500">{{ "%.2f"|format(machine.current_amp) }} A</span>
+                </div>
+                <div class="last-update text-[10px] text-slate-600 mt-1">Update: -</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Control Buttons -->
+    <div class="flex flex-wrap gap-3 border-t border-slate-700 pt-4">
+        <button id="btn-auto" data-active="false" class="px-4 py-2 bg-purple-600/80 hover:bg-purple-500 rounded-lg text-sm transition-all flex items-center gap-2">
+            <i class="fas fa-robot"></i> Auto Mode: OFF
+        </button>
+        <button id="btn-demo" class="px-4 py-2 bg-amber-600/80 hover:bg-amber-500 rounded-lg text-sm transition-all flex items-center gap-2">
+            <i class="fas fa-film"></i> Run Demo
+        </button>
+        <button id="btn-quick" class="px-4 py-2 bg-cyan-600/80 hover:bg-cyan-500 rounded-lg text-sm transition-all flex items-center gap-2">
+            <i class="fas fa-bolt"></i> Quick Start (30s)
+        </button>
+        <div class="flex-1"></div>
+        <div class="text-xs text-slate-400 flex items-center gap-2">
+            <i class="fas fa-terminal"></i>
+            <span>Atau jalankan: <code class="bg-slate-800 px-2 py-1 rounded">python simulator.py</code></span>
+        </div>
+    </div>
+    
+    <div id="sim-log" class="mt-3 p-3 bg-slate-950 rounded-lg font-mono text-xs h-24 overflow-y-auto text-emerald-400/80">
+        <div class="text-slate-500 italic">Simulator log akan muncul di sini...</div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Stats Cards -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="metric-card rounded-xl p-4 bg-slate-800/50 border border-slate-700">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-slate-400 text-sm">Total Mesin</span>
+            <div class="w-8 h-8 bg-indigo-500/20 rounded-lg flex items-center justify-center">
+                <i class="fas fa-server text-indigo-400 text-sm"></i>
+            </div>
+        </div>
+        <p class="text-2xl font-bold text-white">{{ total_machines }}</p>
+    </div>
+    
+    <div class="metric-card rounded-xl p-4 bg-slate-800/50 border border-slate-700">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-slate-400 text-sm">Online/Standby</span>
+            <div class="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                <i class="fas fa-wifi text-blue-400 text-sm"></i>
+            </div>
+        </div>
+        <p class="text-2xl font-bold text-blue-400" id="stat-online">{{ online_machines }}</p>
+    </div>
+    
+    <div class="metric-card rounded-xl p-4 bg-slate-800/50 border border-slate-700">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-slate-400 text-sm">Running</span>
+            <div class="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
+                <i class="fas fa-play text-green-400 text-sm"></i>
+            </div>
+        </div>
+        <p class="text-2xl font-bold text-green-400" id="stat-running">{{ running_machines }}</p>
+    </div>
+    
+    <div class="metric-card rounded-xl p-4 bg-slate-800/50 border border-slate-700">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-slate-400 text-sm">Sesi Hari Ini</span>
+            <div class="w-8 h-8 bg-amber-500/20 rounded-lg flex items-center justify-center">
+                <i class="fas fa-calendar-day text-amber-400 text-sm"></i>
+            </div>
+        </div>
+        <p class="text-2xl font-bold text-amber-400" id="stat-sessions">{{ today_sessions }}</p>
+    </div>
+</div>
+
+<!-- Main Control Panel -->
+<div class="glass-panel rounded-2xl p-6 mb-6 border border-slate-700 bg-slate-900/50 backdrop-blur-sm">
+    <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div class="flex items-center gap-4">
+            <div id="system-status" class="px-6 py-3 bg-blue-500/10 border border-blue-500/30 rounded-full text-blue-400 font-bold flex items-center gap-2">
+                <i class="fas fa-pause"></i>
+                <span>STANDBY</span>
+            </div>
+        </div>
+        
+        <div class="flex items-center gap-3">
+            <button id="btn-start-all" class="group px-6 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-semibold flex items-center gap-2 transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40">
+                <i class="fas fa-play group-hover:scale-110 transition-transform"></i>
+                <span>START ALL</span>
+            </button>
+            <button id="btn-stop-all" class="group px-6 py-3 bg-red-600/80 hover:bg-red-500 rounded-xl font-semibold flex items-center gap-2 transition-all shadow-lg shadow-red-500/20 hover:shadow-red-500/40">
+                <i class="fas fa-stop group-hover:scale-110 transition-transform"></i>
+                <span>STOP ALL</span>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Sync Status -->
+    <div id="sync-status" class="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 mb-6 flex items-center gap-3 text-emerald-400">
+        <i class="fas fa-check-circle text-xl"></i>
+        <div>
+            <p class="font-medium">Sistem Sinkron</p>
+            <p class="text-sm text-emerald-400/70">Terhubung dengan ESP32 / Simulator (Auto-refresh: ON)</p>
+        </div>
+    </div>
+    
+    <!-- Metrics Grid -->
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div class="metric-card rounded-xl p-4 text-center bg-slate-800/50 border border-slate-700">
+            <div class="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center mx-auto mb-2">
+                <i class="fas fa-bullseye text-blue-400"></i>
+            </div>
+            <p class="text-xs text-slate-400 uppercase mb-1">Target</p>
+            <p class="text-xl font-bold text-white" id="target-status">OFF</p>
+        </div>
+        
+        <div class="metric-card rounded-xl p-4 text-center bg-slate-800/50 border border-slate-700">
+            <div class="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center mx-auto mb-2">
+                <i class="fas fa-bolt text-orange-400"></i>
+            </div>
+            <p class="text-xs text-slate-400 uppercase mb-1">Aktual</p>
+            <p class="text-xl font-bold text-red-400" id="actual-status">OFF</p>
+        </div>
+        
+        <div class="bg-indigo-600/20 rounded-xl p-4 text-center border border-indigo-500/30">
+            <div class="w-10 h-10 bg-indigo-500/30 rounded-lg flex items-center justify-center mx-auto mb-2">
+                <i class="fas fa-plug text-indigo-300"></i>
+            </div>
+            <p class="text-xs text-indigo-300 uppercase mb-1">Arus Listrik</p>
+            <p class="text-2xl font-bold text-white"><span id="current-amp">0.00</span> <span class="text-lg">A</span></p>
+        </div>
+        
+        <!-- WIFI SIGNAL -->
+        <div class="metric-card rounded-xl p-4 text-center relative overflow-hidden bg-slate-800/50 border border-slate-700">
+            <div class="absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-transparent opacity-0 transition-opacity" id="wifi-glow"></div>
+            
+            <div class="relative z-10">
+                <div class="w-10 h-10 bg-cyan-500/20 rounded-lg flex items-center justify-center mx-auto mb-2 transition-all" id="wifi-icon-container">
+                    <i class="fas fa-wifi text-cyan-400" id="wifi-icon"></i>
+                </div>
+                <p class="text-xs text-slate-400 uppercase mb-1">WiFi Signal</p>
+                
+                <div class="flex items-center justify-center gap-2 mb-1">
+                    <div class="flex gap-0.5 items-end h-4" id="wifi-bars">
+                        <div class="w-1 bg-slate-600 rounded-sm transition-all" style="height: 4px;"></div>
+                        <div class="w-1 bg-slate-600 rounded-sm transition-all" style="height: 8px;"></div>
+                        <div class="w-1 bg-cyan-400 rounded-sm transition-all" style="height: 12px;"></div>
+                        <div class="w-1 bg-slate-600 rounded-sm transition-all" style="height: 16px;"></div>
+                    </div>
+                    <span class="text-lg font-bold text-cyan-400" id="wifi-signal-value">-</span>
+                </div>
+                
+                <p class="text-xs text-slate-500 truncate max-w-[120px] mx-auto" id="wifi-ssid">Scanning...</p>
+            </div>
+        </div>
+        
+        <div class="metric-card rounded-xl p-4 text-center bg-slate-800/50 border border-slate-700">
+            <div class="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center mx-auto mb-2">
+                <i class="fas fa-clock text-purple-400"></i>
+            </div>
+            <p class="text-xs text-slate-400 uppercase mb-1">Terakhir Update</p>
+            <p class="text-sm font-bold text-slate-300" id="last-update">-</p>
+        </div>
+        
+        <div class="metric-card rounded-xl p-4 text-center bg-slate-800/50 border border-slate-700">
+            <div class="w-10 h-10 bg-slate-600/30 rounded-lg flex items-center justify-center mx-auto mb-2">
+                <i class="fas fa-wrench text-slate-400"></i>
+            </div>
+            <p class="text-xs text-slate-400 uppercase mb-1">Status Mesin</p>
+            <p class="text-xl font-bold text-white" id="machine-status">STANDBY</p>
+        </div>
+    </div>
+</div>
+
+<!-- Activity History -->
+<div class="glass-panel rounded-2xl p-6 border border-slate-700 bg-slate-900/50 backdrop-blur-sm">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold flex items-center gap-2">
+            <i class="fas fa-history text-indigo-400"></i>
+            Riwayat Aktivitas
+        </h3>
+        <div class="flex gap-2">
+            <span class="px-3 py-1 bg-slate-700 rounded-full text-xs text-slate-300" id="history-count">0 records</span>
+            <button id="btn-refresh" class="p-2 hover:bg-slate-700 rounded-lg transition-all" title="Refresh">
+                <i class="fas fa-sync-alt text-slate-400"></i>
+            </button>
+        </div>
+    </div>
+    
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="text-left border-b border-slate-700">
+                    <th class="pb-3 font-medium text-slate-400">NO</th>
+                    <th class="pb-3 font-medium text-slate-400">MESIN</th>
+                    <th class="pb-3 font-medium text-slate-400">WAKTU MULAI</th>
+                    <th class="pb-3 font-medium text-slate-400">WAKTU SELESAI</th>
+                    <th class="pb-3 font-medium text-slate-400">DURASI</th>
+                    <th class="pb-3 font-medium text-slate-400">ARUS MAX</th>
+                    <th class="pb-3 font-medium text-slate-400">STATUS</th>
+                </tr>
+            </thead>
+            <tbody class="text-slate-300" id="activity-table">
+                <tr>
+                    <td colspan="7" class="py-8 text-center text-slate-500">
+                        <i class="fas fa-inbox text-3xl mb-2 block"></i>
+                        Belum ada data aktivitas
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<style>
+/* Status animations */
+.machine-card {
+    transition: all 0.3s ease;
+}
+
+.machine-card[data-status="running"] {
+    border-color: rgba(74, 222, 128, 0.5);
+    box-shadow: 0 0 15px rgba(74, 222, 128, 0.2);
+}
+
+.machine-card[data-status="standby"] {
+    border-color: rgba(96, 165, 250, 0.5);
+}
+
+.machine-card[data-type="dryer"][data-status="running"] {
+    border-color: rgba(251, 146, 60, 0.5);
+    box-shadow: 0 0 15px rgba(251, 146, 60, 0.2);
+}
+
+.machine-card[data-type="washer"][data-status="running"] {
+    border-color: rgba(96, 165, 250, 0.5);
+    box-shadow: 0 0 15px rgba(96, 165, 250, 0.2);
+}
+
+.machine-status {
+    transition: all 0.3s ease;
+}
+
+.status-toast {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Pulse animation for running status */
+@keyframes pulse-green {
+    0%, 100% { 
+        opacity: 1;
+        box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7);
+    }
+    50% { 
+        opacity: 0.8;
+        box-shadow: 0 0 0 10px rgba(74, 222, 128, 0);
+    }
+}
+
+.animate-pulse-green {
+    animation: pulse-green 2s infinite;
+}
+</style>
+
+<script>
+// ==================== REAL-TIME STATUS UPDATE ====================
+
+let statusUpdateInterval;
+let lastMachineStatus = {};
+let isAutoRefreshEnabled = true;
+
+function initRealTimeUpdates() {
+    // Update setiap 2 detik
+    statusUpdateInterval = setInterval(() => {
+        if(isAutoRefreshEnabled) {
+            updateMachineStatus();
+        }
+    }, 2000);
+    
+    // Initial update
+    updateMachineStatus();
+    updateDashboard();
+    refreshHistory();
+    updateWiFiSignal();
+    
+    console.log('✅ Auto-refresh initialized (2s interval)');
+}
+
+function stopRealTimeUpdates() {
+    isAutoRefreshEnabled = false;
+    clearInterval(statusUpdateInterval);
+}
+
+function resumeRealTimeUpdates() {
+    isAutoRefreshEnabled = true;
+    statusUpdateInterval = setInterval(updateMachineStatus, 2000);
+}
+
+function updateMachineStatus() {
+    fetch('/api/status')
+        .then(response => {
+            if(!response.ok) throw new Error('Network error');
+            return response.json();
+        })
+        .then(data => {
+            data.forEach(machine => {
+                const machineId = machine.id;
+                const newStatus = machine.status;
+                const oldStatus = lastMachineStatus[machineId]?.status;
+                
+                // Update DOM elements
+                updateMachineCard(machine);
+                
+                // Check if status changed
+                if (oldStatus && oldStatus !== newStatus) {
+                    console.log(`🔄 Status change: ${machine.name} ${oldStatus} → ${newStatus}`);
+                    showStatusNotification(machine, oldStatus, newStatus);
+                    
+                    // Refresh history on status change to completed
+                    if(newStatus === 'standby' && oldStatus === 'running') {
+                        setTimeout(refreshHistory, 500);
+                    }
+                }
+                
+                // Save current status
+                lastMachineStatus[machineId] = {
+                    status: newStatus,
+                    amp: machine.current_amp,
+                    timestamp: new Date().toISOString()
+                };
+            });
+            
+            // Update global stats
+            updateStats(data);
+        })
+        .catch(err => {
+            console.error('❌ Status update error:', err);
+            // Show offline indicator
+            document.getElementById('sync-status').className = 'bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-6 flex items-center gap-3 text-red-400';
+            document.getElementById('sync-status').innerHTML = '<i class="fas fa-exclamation-triangle text-xl"></i><div><p class="font-medium">Koneksi Terputus</p><p class="text-sm text-red-400/70">Tidak dapat terhubung ke server</p></div>';
+        });
+}
+
+function updateMachineCard(machine) {
+    // Find machine card by ID
+    const card = document.querySelector(`.machine-card[data-machine-id="${machine.id}"]`);
+    if (!card) return;
+    
+    // Update data-status attribute
+    card.setAttribute('data-status', machine.status);
+    
+    // Update status indicator
+    const statusEl = card.querySelector('.machine-status');
+    if (statusEl) {
+        // ✅ Standarisasi display text dan styling
+        let displayStatus = '';
+        let statusClass = '';
+        
+        switch(machine.status) {
+            case 'running':
+                displayStatus = '🟢 RUNNING';
+                statusClass = 'text-green-400 animate-pulse';
+                break;
+            case 'standby':
+                displayStatus = '⚪ STANDBY';
+                statusClass = 'text-blue-400';
+                break;
+            case 'offline':
+                displayStatus = '⚪ OFFLINE';
+                statusClass = 'text-gray-500';
+                break;
+            default:
+                displayStatus = '⚪ STANDBY';
+                statusClass = 'text-blue-400';
+        }
+        
+        statusEl.textContent = displayStatus;
+        statusEl.className = `machine-status text-xs font-mono font-bold ${statusClass}`;
+    }
+    
+    // Update AMP display
+    const ampEl = card.querySelector('.machine-amp');
+    if (ampEl) {
+        ampEl.textContent = `${machine.current_amp.toFixed(2)} A`;
+    }
+    
+    // Update last update time
+    const timeEl = card.querySelector('.last-update');
+    if (timeEl) {
+        timeEl.textContent = `Update: ${new Date().toLocaleTimeString('id-ID')}`;
+    }
+}
+
+function updateStats(data) {
+    const running = data.filter(m => m.status === 'running').length;
+    const standby = data.filter(m => m.status === 'standby').length;
+    const total = data.length;
+    
+    // Update stat elements
+    const statRunning = document.getElementById('stat-running');
+    const statOnline = document.getElementById('stat-online');
+    
+    if(statRunning) {
+        statRunning.textContent = running;
+        // Animate if changed
+        statRunning.classList.add('scale-110');
+        setTimeout(() => statRunning.classList.remove('scale-110'), 200);
+    }
+    if(statOnline) {
+        statOnline.textContent = standby + running; // Online = standby + running
+    }
+}
+
+function showStatusNotification(machine, oldStatus, newStatus) {
+    // Remove existing toasts to prevent overflow
+    const existingToasts = document.querySelectorAll('.status-toast');
+    if(existingToasts.length > 3) {
+        existingToasts[0].remove();
+    }
+    
+    const toast = document.createElement('div');
+    toast.className = 'status-toast fixed top-20 right-4 z-50 p-4 rounded-xl shadow-lg transform transition-all duration-500';
+    
+    const statusConfig = {
+        'running': { 
+            color: 'bg-green-500', 
+            icon: 'fa-play', 
+            text: 'white',
+            border: 'border-green-400/50'
+        },
+        'standby': { 
+            color: 'bg-blue-500', 
+            icon: 'fa-pause', 
+            text: 'white',
+            border: 'border-blue-400/50'
+        },
+        'offline': { 
+            color: 'bg-gray-600', 
+            icon: 'fa-wifi-slash', 
+            text: 'white',
+            border: 'border-gray-400/50'
+        }
+    };
+    
+    const cfg = statusConfig[newStatus] || statusConfig['standby'];
+    
+    toast.className += ` ${cfg.color} text-${cfg.text} border ${cfg.border} backdrop-blur-sm`;
+    toast.style.top = `${80 + (existingToasts.length * 70)}px`;
+    
+    toast.innerHTML = `
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                <i class="fas ${cfg.icon}"></i>
+            </div>
+            <div>
+                <p class="font-bold text-sm">${machine.name}</p>
+                <p class="text-xs opacity-90">${oldStatus.toUpperCase()} → ${newStatus.toUpperCase()}</p>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    // Play notification sound (optional)
+    playStatusSound(newStatus);
+    
+    // Remove after 4 seconds
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => toast.remove(), 500);
+    }, 4000);
+}
+
+function playStatusSound(status) {
+    // Simple beep using Web Audio API (optional enhancement)
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if(!AudioContext) return;
+        
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        
+        if(status === 'running') {
+            osc.frequency.value = 800; // Higher pitch for start
+        } else {
+            osc.frequency.value = 400; // Lower pitch for stop
+        }
+        
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        
+        osc.start();
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+        osc.stop(ctx.currentTime + 0.1);
+    } catch(e) {
+        // Silent fail
+    }
+}
+
+// ==================== SIMULATION CONTROLS ====================
+
+function simLog(message) {
+    const log = document.getElementById('sim-log');
+    if(!log) return;
+    
+    const time = new Date().toLocaleTimeString('id-ID');
+    const entry = document.createElement('div');
+    entry.className = 'mb-1';
+    entry.innerHTML = `<span class="text-slate-500">[${time}]</span> ${message}`;
+    
+    // Remove "italic" placeholder if exists
+    if(log.querySelector('.italic')) {
+        log.innerHTML = '';
+    }
+    
+    log.appendChild(entry);
+    log.scrollTop = log.scrollHeight;
+    
+    // Limit log entries
+    while(log.children.length > 50) {
+        log.removeChild(log.firstChild);
+    }
+}
+
+function simControl(machineId, action) {
+    const btn = event.target.closest('button');
+    if(btn) {
+        btn.disabled = true;
+        setTimeout(() => btn.disabled = false, 1000);
+    }
+    
+    fetch('/simulator/control', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            machine_id: machineId,
+            action: action,
+            timestamp: new Date().toISOString()
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if(data.success) {
+            simLog(`✅ ${action.toUpperCase()} Machine ${machineId}: ${data.message}`);
+            
+            // Immediate visual feedback
+            const statusEl = document.getElementById(`sim-status-${machineId}`);
+            if(statusEl) {
+                const statusText = action === 'start' ? '🟢 RUNNING' : '⚪ STANDBY';
+                const statusClass = action === 'start' ? 'text-green-400 animate-pulse' : 'text-blue-400';
+                statusEl.textContent = statusText;
+                statusEl.className = `machine-status text-xs font-mono font-bold ${statusClass}`;
+            }
+            
+            // Force status update
+            setTimeout(updateMachineStatus, 300);
+        } else {
+            simLog(`⚠️ ${data.message}`);
+        }
+    })
+    .catch(e => {
+        simLog(`❌ Error: ${e.message}`);
+    });
+}
+
+function simAutoMode() {
+    const btn = document.getElementById('btn-auto');
+    if(!btn) return;
+    
+    const isActive = btn.dataset.active === 'true';
+    
+    if(isActive) {
+        clearInterval(window.autoModeInterval);
+        btn.dataset.active = 'false';
+        btn.innerHTML = '<i class="fas fa-robot"></i> Auto Mode: OFF';
+        btn.classList.remove('bg-purple-500', 'animate-pulse');
+        btn.classList.add('bg-purple-600/80');
+        simLog('🤖 Auto mode stopped');
+    } else {
+        simLog('🤖 Auto mode started - Random start/stop every 10s');
+        btn.dataset.active = 'true';
+        btn.innerHTML = '<i class="fas fa-robot"></i> Auto Mode: ON';
+        btn.classList.remove('bg-purple-600/80');
+        btn.classList.add('bg-purple-500', 'animate-pulse');
+        
+        // Immediate first run
+        fetch('/simulator/auto', {method: 'POST'})
+            .then(r => r.json())
+            .then(data => simLog(`🔄 Auto: ${data.message}`));
+        
+        window.autoModeInterval = setInterval(() => {
+            fetch('/simulator/auto', {method: 'POST'})
+            .then(r => r.json())
+            .then(data => simLog(`🔄 Auto: ${data.message}`));
+        }, 10000);
+    }
+}
+
+function simDemo() {
+    simLog('🎬 Starting demo sequence...');
+    const sequence = [
+        {id: 1, delay: 0, duration: 45},
+        {id: 2, delay: 2000, duration: 60},
+        {id: 3, delay: 30000, duration: 90},
+        {id: 4, delay: 35000, duration: 75}
+    ];
+    
+    sequence.forEach(item => {
+        setTimeout(() => {
+            simLog(`▶️ Starting Machine ${item.id} (${item.duration}s)`);
+            fetch('/simulator/control', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    machine_id: item.id,
+                    action: 'start',
+                    duration: item.duration
+                })
+            });
+        }, item.delay);
+    });
+}
+
+function simQuickStart() {
+    simLog('⚡ Quick start all machines (30s auto-stop)...');
+    [1, 2, 3, 4].forEach((id, i) => {
+        setTimeout(() => {
+            fetch('/simulator/control', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    machine_id: id,
+                    action: 'start',
+                    duration: 30
+                })
+            }).then(() => simLog(`⚡ Machine ${id} quick started`));
+        }, i * 500);
+    });
+}
+
+// ==================== DASHBOARD UPDATES ====================
+
+function updateDashboard() {
+    fetch('/api/status')
+    .then(r => r.json())
+    .then(data => {
+        if(data.length > 0) {
+            const online = data.filter(m => m.status !== 'offline').length;
+            const running = data.filter(m => m.status === 'running').length;
+            
+            const statOnline = document.getElementById('stat-online');
+            const statRunning = document.getElementById('stat-running');
+            if(statOnline) statOnline.textContent = online;
+            if(statRunning) statRunning.textContent = running;
+            
+            const active = data.find(m => m.status === 'running') || data[0];
+            if(active) {
+                const currentAmp = document.getElementById('current-amp');
+                const actualStatus = document.getElementById('actual-status');
+                const targetStatus = document.getElementById('target-status');
+                const machineStatus = document.getElementById('machine-status');
+                const sysStatus = document.getElementById('system-status');
+                
+                if(currentAmp) currentAmp.textContent = active.current_amp.toFixed(2);
+                if(actualStatus) actualStatus.textContent = active.actual_status;
+                if(targetStatus) targetStatus.textContent = active.target_status;
+                
+                // ✅ Standarisasi status display
+                let displayStatus = active.status.toUpperCase();
+                if(displayStatus === 'STOPPED' || displayStatus === 'OFFLINE') displayStatus = 'STANDBY';
+                if(machineStatus) machineStatus.textContent = displayStatus;
+                
+                if(sysStatus) {
+                    if(active.status === 'running') {
+                        sysStatus.className = 'px-6 py-3 bg-green-500/20 border border-green-500/50 rounded-full text-green-400 font-bold flex items-center gap-2 animate-pulse';
+                        sysStatus.innerHTML = '<i class="fas fa-play"></i><span>RUNNING</span>';
+                    } else if(active.status === 'standby') {
+                        sysStatus.className = 'px-6 py-3 bg-blue-500/20 border border-blue-500/50 rounded-full text-blue-400 font-bold flex items-center gap-2';
+                        sysStatus.innerHTML = '<i class="fas fa-pause"></i><span>STANDBY</span>';
+                    } else {
+                        sysStatus.className = 'px-6 py-3 bg-amber-500/20 border border-amber-500/50 rounded-full text-amber-400 font-bold flex items-center gap-2';
+                        sysStatus.innerHTML = '<i class="fas fa-power-off"></i><span>OFFLINE</span>';
+                    }
+                }
+            }
+        }
+        
+        const lastUpdate = document.getElementById('last-update');
+        if(lastUpdate) lastUpdate.textContent = new Date().toLocaleTimeString('id-ID');
+    });
+}
+
+function refreshHistory() {
+    fetch('/api/sessions/today')
+    .then(r => r.json())
+    .then(data => {
+        const tbody = document.getElementById('activity-table');
+        const statSessions = document.getElementById('stat-sessions');
+        const historyCount = document.getElementById('history-count');
+        
+        if(statSessions) statSessions.textContent = data.length;
+        if(historyCount) historyCount.textContent = data.length + ' records';
+        
+        if(!tbody) return;
+        
+        if(data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-slate-500"><i class="fas fa-inbox text-3xl mb-2 block"></i>Belum ada data aktivitas</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = data.map((s, i) => {
+            const endTimeClass = s.end_time !== '-' ? 'text-amber-400' : 'text-slate-500';
+            const statusClass = s.status === 'running' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 
+                               s.status === 'completed' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 
+                               'bg-slate-500/20 text-slate-400 border border-slate-500/30';
+            
+            return `<tr class="border-b border-slate-800 hover:bg-slate-800/50 transition-colors">
+                <td class="py-3">${i + 1}</td>
+                <td class="py-3 font-medium">${s.machine_name}</td>
+                <td class="py-3 text-green-400 font-mono">${s.start_time}</td>
+                <td class="py-3 ${endTimeClass} font-mono">${s.end_time}</td>
+                <td class="py-3 font-mono text-cyan-400">${s.duration}</td>
+                <td class="py-3 font-mono">${s.max_amp.toFixed(2)} A</td>
+                <td class="py-3"><span class="px-2 py-1 rounded text-xs ${statusClass}">${s.status.toUpperCase()}</span></td>
+            </tr>`;
+        }).join('');
+    });
+}
+
+// ==================== WIFI STATUS ====================
+
+function updateWiFiSignal() {
+    fetch('/api/wifi/status')
+    .then(r => r.json())
+    .then(data => {
+        const bars = document.querySelectorAll('#wifi-bars div');
+        const value = document.getElementById('wifi-signal-value');
+        const ssid = document.getElementById('wifi-ssid');
+        const icon = document.getElementById('wifi-icon');
+        const glow = document.getElementById('wifi-glow');
+        const container = document.getElementById('wifi-icon-container');
+        
+        if (data.status === 'connected') {
+            if(value) value.textContent = data.signal + '%';
+            if(ssid) ssid.textContent = data.ssid;
+            if(icon) icon.className = 'fas fa-wifi text-cyan-400';
+            if(glow) glow.style.opacity = '1';
+            if(container) container.classList.add('animate-pulse');
+            
+            bars.forEach((bar, i) => {
+                if (i < data.bars) {
+                    bar.classList.remove('bg-slate-600');
+                    bar.classList.add('bg-cyan-400');
+                } else {
+                    bar.classList.remove('bg-cyan-400');
+                    bar.classList.add('bg-slate-600');
+                }
+            });
+        } else {
+            if(value) value.textContent = '-';
+            if(ssid) ssid.textContent = 'Disconnected';
+            if(icon) icon.className = 'fas fa-wifi-slash text-slate-500';
+            if(glow) glow.style.opacity = '0';
+            if(container) container.classList.remove('animate-pulse');
+            bars.forEach(bar => {
+                bar.classList.remove('bg-cyan-400');
+                bar.classList.add('bg-slate-600');
+            });
+        }
+    });
+}
+
+function sendCommand(cmd) {
+    fetch('/api/command', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({command: cmd})
+    }).then(r => r.json()).then(data => {
+        if(data.success) {
+            showAlert(`Command ${cmd} executed`, 'success');
+        }
+    });
+}
+
+function showAlert(message, type) {
+    const container = document.getElementById('status-alerts');
+    if(!container) return;
+    
+    const alert = document.createElement('div');
+    alert.className = 'px-4 py-3 rounded-xl shadow-lg transform transition-all duration-300 ' + 
+        (type === 'success' ? 'bg-emerald-500/90 text-white' : 'bg-blue-500/90 text-white');
+    alert.innerHTML = '<i class="fas fa-check-circle mr-2"></i>' + message;
+    container.appendChild(alert);
+    
+    setTimeout(() => {
+        alert.style.opacity = '0';
+        alert.style.transform = 'translateX(100%)';
+        setTimeout(() => alert.remove(), 300);
+    }, 3000);
+}
+
+// ==================== EVENT LISTENERS ====================
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize real-time updates
+    initRealTimeUpdates();
+    
+    // Simulation control buttons
+    document.querySelectorAll('.sim-control-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const machineId = parseInt(this.getAttribute('data-machine-id'));
+            const action = this.getAttribute('data-action');
+            simControl(machineId, action);
+        });
+    });
+    
+    // Auto mode button
+    const btnAuto = document.getElementById('btn-auto');
+    if(btnAuto) {
+        btnAuto.addEventListener('click', simAutoMode);
+    }
+    
+    // Demo button
+    const btnDemo = document.getElementById('btn-demo');
+    if(btnDemo) {
+        btnDemo.addEventListener('click', simDemo);
+    }
+    
+    // Quick start button
+    const btnQuick = document.getElementById('btn-quick');
+    if(btnQuick) {
+        btnQuick.addEventListener('click', simQuickStart);
+    }
+    
+    // Refresh button
+    const btnRefresh = document.getElementById('btn-refresh');
+    if(btnRefresh) {
+        btnRefresh.addEventListener('click', () => {
+            btnRefresh.querySelector('i').classList.add('fa-spin');
+            refreshHistory();
+            setTimeout(() => btnRefresh.querySelector('i').classList.remove('fa-spin'), 1000);
+        });
+    }
+    
+    // Start/Stop all buttons
+    const btnStartAll = document.getElementById('btn-start-all');
+    if(btnStartAll) {
+        btnStartAll.addEventListener('click', () => sendCommand('START'));
+    }
+    
+    const btnStopAll = document.getElementById('btn-stop-all');
+    if(btnStopAll) {
+        btnStopAll.addEventListener('click', () => sendCommand('STOP'));
+    }
+    
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+        if(e.key === 'r' && e.ctrlKey) {
+            e.preventDefault();
+            refreshHistory();
+        }
+        if(e.key === ' ') {
+            e.preventDefault();
+            // Space to toggle auto mode (if focused on sim panel)
+        }
+    });
+    
+    // Visibility API - pause when tab hidden
+    document.addEventListener('visibilitychange', () => {
+        if(document.hidden) {
+            console.log('⏸️ Tab hidden - reducing refresh rate');
+            // Could reduce interval here if needed
+        } else {
+            console.log('▶️ Tab visible - normal refresh rate');
+            updateMachineStatus(); // Immediate update
+        }
+    });
+});
+
+// Update intervals (backup)
+setInterval(updateDashboard, 5000);
+setInterval(updateWiFiSignal, 10000);
+setInterval(refreshHistory, 30000); // Refresh history every 30s
+
+console.log('🧺 Laundry Monitor Dashboard Loaded');
+</script>
+{% endblock %}

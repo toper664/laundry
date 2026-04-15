@@ -1,44 +1,45 @@
-import jwt from 'jsonwebtoken';
-import fs from 'fs';
-import path from 'path';
+import jwt, { type Secret } from 'jsonwebtoken';
+import sha256 from 'fast-sha256';
+import { config } from '../config/conf.ts';
 
-export const privateKey = fs.readFileSync(
-  path.join(process.cwd(), 'keys/priv.key'),
-  'utf8'
-);
+export const REFRESH_TTL_SECS = 24 * 60 * 60;
+export const ACCESS_TTL = '20m';
 
-export const publicKey = fs.readFileSync(
-  path.join(process.cwd(), 'keys/pub.key'),
-  'utf8'
-);
+export function hashToken(token: string): string {
+  return sha256.hash(Buffer.from(token, 'utf-8')).toString();
+};
 
 export interface JwtPayload {
   userId: number;
   username: string;
 }
 
-export const generateAccessToken = (payload: JwtPayload): string => {
-  return jwt.sign(payload, privateKey, {
+export function generateAccessToken(payload: JwtPayload): string {
+  const JWT_SECRET: Secret = config.ACCESS_KEY;
+  return jwt.sign(payload, JWT_SECRET, {
     algorithm: 'ES256',
-    expiresIn: '20m',
+    expiresIn: ACCESS_TTL,
   });
 };
 
-export const generateRefreshToken = (payload: JwtPayload): string => {
-  return jwt.sign(payload, privateKey, {
+export function generateRefreshToken(payload: JwtPayload): string {
+  const JWT_SECRET: Secret = config.REFRESH_KEY;
+  return jwt.sign(payload, JWT_SECRET, {
     algorithm: 'ES256',
-    expiresIn: '24h',
+    expiresIn: REFRESH_TTL_SECS,
   });
 };
 
-export const verifyAccessToken = (token: string): JwtPayload => {
-  return jwt.verify(token, publicKey, {
+export function verifyAccessToken(token: string): JwtPayload {
+  const JWT_SECRET: Secret = config.ACCESS_KEY_PUB;
+  return jwt.verify(token, JWT_SECRET, {
     algorithms: ['ES256'],
   }) as JwtPayload;
 };
 
-export const verifyRefreshToken = (token: string): JwtPayload => {
-  return jwt.verify(token, publicKey, {
+export function verifyRefreshToken(token: string): JwtPayload {
+  const JWT_SECRET: Secret = config.REFRESH_KEY_PUB;
+  return jwt.verify(token, JWT_SECRET, {
     algorithms: ['ES256'],
   }) as JwtPayload;
 };

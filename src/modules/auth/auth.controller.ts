@@ -1,10 +1,11 @@
 import { type Request, type Response } from 'express';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
-import { verifyRefreshToken, generateAccessToken, generateRefreshToken } from '../../utils/jwt.ts';
+import { verifyRefreshToken, generateAccessToken, generateRefreshToken, hashToken } from '../../utils/jwt.ts';
 import { AppDataSource } from '../../config/database.ts';
 import { UserRepository } from '../user/user.queries.ts';
-import { registerSchema, loginSchema } from './auth.schema.ts';
+import { REFRESH_TTL_SECS } from '../../utils/jwt.ts';
+import { loginSchema } from './auth.schema.ts';
 
 const repo = new UserRepository(AppDataSource);
 const SALT_ROUNDS = 12;
@@ -42,21 +43,24 @@ export const register = async (
     const accessToken = generateAccessToken(payload);
     const refreshToken = generateRefreshToken(payload);
 
-    user.refreshToken = refreshToken;
+    user.refreshToken = hashToken(refreshToken);
     await repo.save(user);
 
-    return res.status(201).cookie('jwt', refreshToken, {
+    return res.status(201).cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: true,
       sameSite: 'strict',
-      maxAge: 24 * 60 * 60 * 1000
+      maxAge: REFRESH_TTL_SECS * 1000
+    }).cookie('accessToken', accessToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict'
     }).json({
       success: true,
       user: {
         id: user.id,
         username: user.username,
       },
-      accessToken,
     });
   } catch (err: any) {
     return res.status(500).json({
@@ -102,18 +106,21 @@ export const login = async (
     const accessToken = generateAccessToken(payload);
     const refreshToken = generateRefreshToken(payload);
 
-    repo.update(payload.userId, { refreshToken: refreshToken });
+    repo.update(payload.userId, { refreshToken: hashToken(refreshToken) });
 
-    return res.cookie('jwt', refreshToken, {
+    return res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: true,
       sameSite: 'strict',
-      maxAge: 24 * 60 * 60 * 1000
+      maxAge: REFRESH_TTL_SECS * 1000
+    }).cookie('accessToken', accessToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict'
     }).json({
       success: true,
       user: payload,
-      accessToken,
-    });
+  });
   } catch (err: any) {
     return res.status(500).json({
       success: false,
@@ -124,13 +131,21 @@ export const login = async (
 
 export const refresh = async (req: Request, res: Response) => {
   try {
-    const { refreshToken } = req.body;
+    const refreshToken = req.cookies.refreshToken;
 
     if (!refreshToken) {
       return res.status(401).json({ error: 'Refresh token required' });
     }
 
     const payload = verifyRefreshToken(refreshToken);
+    if (!payload) {
+      return res.status(401).json({ error: 'Invalid refresh token' });
+    }
+
+    const user = await repo.findById(payload.userId);
+    if (!user || user.refreshToken !== hashToken(refreshToken)) {
+      return res.status(401).json({ error: 'Unrecognized refresh token' });
+    }
 
     const newAccessToken = generateAccessToken({
       userId: payload.userId,
@@ -142,19 +157,22 @@ export const refresh = async (req: Request, res: Response) => {
       username: payload.username,
     });
 
-    await repo.update(payload.userId, { refreshToken: newRefreshToken });
+    await repo.update(payload.userId, { refreshToken: hashToken(newRefreshToken) });
 
-    return res.cookie('jwt', newRefreshToken, {
+    return res.cookie('refreshToken', newRefreshToken, {
       httpOnly: true,
       secure: true,
       sameSite: 'strict',
-      maxAge: 24 * 60 * 60 * 1000
+      maxAge: REFRESH_TTL_SECS * 1000
+    }).cookie('accessToken', newAccessToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict'
     }).json({
       success: true,
-      accessToken: newAccessToken,
     });
   } catch (err) {
-    return res.status(401).json({ error: 'Invalid refresh token' });
+    return res.status(401).json({ error: 'Invalid or expired refresh token' });
   }
 };
 
@@ -171,7 +189,7 @@ export const logout = async (req: Request, res: Response) => {
         return res.status(401).json({ error: 'Invalid refresh token' });
       }
     }
-    return res.status(200).clearCookie('jwt').json({ message: 'Logged out' });
+    return res.status(200).clearCookie('refreshToken').json({ message: 'Logged out' });
   } catch (err) {
     return res.status(400).json({ error: 'Bad request' });
   }

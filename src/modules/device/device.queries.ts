@@ -8,6 +8,10 @@ export class DeviceRepository {
     this.repo = dataSource.getRepository(Device);
   }
 
+  create(data: Partial<Device>): Device {
+    return this.repo.create(data);
+  }
+
   findAll(): Promise<Device[]> {
     return this.repo.find();
   }

@@ -1,16 +1,18 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
 import session from 'express-session';
+import cookieParser from 'cookie-parser';
 import { Eta } from 'eta';
 import * as path from 'path';
-import axios from 'axios';
 import multer from 'multer';
-import { config } from './config/conf.ts';
 
+import { config } from './config/conf.ts';
 import { check } from './middlewares/isAuth.ts';
-import { hasRole, hasPerm } from './middlewares/checkPerm.ts';
+import { hasRole } from './middlewares/checkPerm.ts';
 import authRoutes from './modules/auth/auth.routes.ts';
 import userRoutes from './modules/user/user.routes.ts';
 import apiRoutes from './modules/api/api.routes.ts';
+import deviceRoutes from './modules/device/device.routes.ts';
+import dashboardRoutes from './modules/dashboard/dashboard.routes.ts';
 
 const app = express();
 
@@ -33,16 +35,18 @@ function buildEtaEngine() {
 
 app.engine("eta", buildEtaEngine())
 app.set("view engine", "eta")
+app.set('views', path.join(import.meta.dirname, 'views'));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(session({
-  secret: config.SECRET_KEY,
+  secret: config.ACCESS_KEY,
   resave: false,
   saveUninitialized: false,
   cookie: { maxAge: config.PERMANENT_SESSION_LIFETIME * 1000 },
 }));
 app.use(express.static('static'));
+app.use(cookieParser());
 
 app.get('/status', (req: Request, res: Response) => {
   res.json({
@@ -53,12 +57,12 @@ app.get('/status', (req: Request, res: Response) => {
 
 app.use('/auth', authRoutes);
 app.use(check);
-app.use('/users', hasRole('admin'), userRoutes);
-// app.use('/', dashboardRoutes);
+app.use('/', dashboardRoutes);
 app.use('/api', apiRoutes);
+app.use('/users', hasRole('admin'), userRoutes);
 // app.use('/settings', settingsRoutes);
 // app.use('/profile', profileRoutes);
-// app.use('/devices', deviceRoutes);
+app.use('/machines', deviceRoutes);
 
 app.use(
   (err: Error, req: Request, res: Response, next: NextFunction) => {

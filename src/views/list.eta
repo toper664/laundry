@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <div>
+        <h2 class="text-2xl font-bold">Master Mesin</h2>
+        <p class="text-slate-400 text-sm">Kelola mesin washer dan dryer</p>
+    </div>
+    {% if current_user.has_permission('create_machine') %}
+    <a href="{{ url_for('machine_create') }}" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-xl flex items-center gap-2 transition shadow-lg shadow-indigo-500/20">
+        <i class="fas fa-plus"></i> Tambah Mesin
+    </a>
+    {% endif %}
+</div>
+
+<!-- ============================================ -->
+<!-- DRYER SECTION (DI ATAS) -->
+<!-- ============================================ -->
+<div class="mb-8">
+    <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-orange-400">
+        <i class="fas fa-wind"></i>
+        Mesin Dryer
+        <span class="px-2 py-0.5 bg-orange-500/20 text-orange-300 rounded text-xs">{{ dryers|length }} unit</span>
+    </h3>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {% for machine in dryers %}
+        {# STANDARISASI STATUS: online/None/''/offline → standby #}
+        {% set raw_status = machine.status | default('standby', true) %}
+        {% if raw_status in ['online', ''] %}
+            {% set display_status = 'standby' %}
+        {% elif raw_status in ['offline', None] %}
+            {% set display_status = 'standby' %}
+        {% else %}
+            {% set display_status = raw_status %}
+        {% endif %}
+        
+        <div class="glass-panel rounded-xl p-5 border border-slate-700 hover:border-orange-500/50 transition-all hover:transform hover:scale-[1.02] bg-gradient-to-br from-slate-800/50 to-slate-900/50">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h4 class="font-bold text-lg text-white">{{ machine.name }}</h4>
+                    <p class="text-sm text-slate-400 flex items-center gap-1">
+                        <i class="fas fa-map-marker-alt text-xs"></i>
+                        {{ machine.location or 'Lokasi belum diatur' }}
+                    </p>
+                </div>
+                
+                {# STATUS BADGE dengan standarisasi #}
+                {% if display_status == 'running' %}
+                    <span class="px-3 py-1 rounded-full text-xs font-medium border bg-orange-500/10 text-orange-400 border-orange-500/30 animate-pulse">
+                        RUNNING
+                    </span>
+                {% elif display_status == 'online' %}
+                    <span class="px-3 py-1 rounded-full text-xs font-medium border bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+                        ONLINE
+                    </span>
+                {% else %}
+                    <span class="px-3 py-1 rounded-full text-xs font-medium border bg-slate-600/20 text-slate-400 border-slate-600/30">
+                        STANDBY
+                    </span>
+                {% endif %}
+            </div>
+            
+            <!-- Icon Dryer Besar -->
+            <div class="flex justify-center mb-4">
+                <div class="w-16 h-16 rounded-full bg-orange-500/20 flex items-center justify-center border-2 border-orange-500/30
+                    {% if display_status == 'running' %}animate-pulse shadow-lg shadow-orange-500/30{% endif %}">
+                    <i class="fas fa-wind text-2xl text-orange-400"></i>
+                </div>
+            </div>
+            
+            <div class="space-y-2 text-sm mb-4 p-3 bg-slate-800/30 rounded-lg">
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Threshold Arus:</span>
+                    <span class="text-white font-medium">{{ machine.amp_threshold }} A</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Auto Stop:</span>
+                    <span class="text-white font-medium">{{ machine.auto_stop_seconds }}s</span>
+                </div>
+                {# Debug: tampilkan status asli jika berbeda #}
+                {% if raw_status != display_status %}
+                <div class="flex justify-between text-xs">
+                    <span class="text-slate-500">Status Asli:</span>
+                    <span class="text-amber-400/70">{{ raw_status or 'None' }} → {{ display_status }}</span>
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="flex gap-2">
+                {% if current_user.has_permission('edit_machine') %}
+                <a href="{{ url_for('machine_edit', id=machine.id) }}" class="flex-1 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-center text-sm transition flex items-center justify-center gap-2">
+                    <i class="fas fa-edit"></i> Edit
+                </a>
+                {% endif %}
+                {% if current_user.is_admin() %}
+                <form method="POST" action="{{ url_for('machine_delete', id=machine.id) }}" class="flex-1" onsubmit="return confirm('Yakin hapus mesin ini?')">
+                    <button type="submit" class="w-full py-2 bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded-lg text-sm transition flex items-center justify-center gap-2">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="col-span-full py-12 text-center text-slate-500 border-2 border-dashed border-slate-700 rounded-xl">
+            <i class="fas fa-wind text-4xl mb-3 block text-orange-400/50"></i>
+            <p>Belum ada mesin dryer</p>
+            <a href="{{ url_for('machine_create') }}" class="mt-2 inline-block text-sm text-orange-400 hover:underline">Tambah dryer pertama</a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- WASHER SECTION (DI BAWAH DRYER) -->
+<!-- ============================================ -->
+<div class="mb-8">
+    <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-blue-400">
+        <i class="fas fa-water"></i> 
+        Mesin Washer
+        <span class="px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded text-xs">{{ washers|length }} unit</span>
+    </h3>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {% for machine in washers %}
+        {# STANDARISASI STATUS: online/None/''/offline → standby #}
+        {% set raw_status = machine.status | default('standby', true) %}
+        {% if raw_status in ['online', ''] %}
+            {% set display_status = 'standby' %}
+        {% elif raw_status in ['offline', None] %}
+            {% set display_status = 'standby' %}
+        {% else %}
+            {% set display_status = raw_status %}
+        {% endif %}
+        
+        <div class="glass-panel rounded-xl p-5 border border-slate-700 hover:border-blue-500/50 transition-all hover:transform hover:scale-[1.02] bg-gradient-to-br from-slate-800/50 to-slate-900/50">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h4 class="font-bold text-lg text-white">{{ machine.name }}</h4>
+                    <p class="text-sm text-slate-400 flex items-center gap-1">
+                        <i class="fas fa-map-marker-alt text-xs"></i>
+                        {{ machine.location or 'Lokasi belum diatur' }}
+                    </p>
+                </div>
+                
+                {# STATUS BADGE dengan standarisasi #}
+                {% if display_status == 'running' %}
+                    <span class="px-3 py-1 rounded-full text-xs font-medium border bg-blue-500/10 text-blue-400 border-blue-500/30 animate-pulse">
+                        RUNNING
+                    </span>
+                {% elif display_status == 'online' %}
+                    <span class="px-3 py-1 rounded-full text-xs font-medium border bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+                        ONLINE
+                    </span>
+                {% else %}
+                    <span class="px-3 py-1 rounded-full text-xs font-medium border bg-slate-600/20 text-slate-400 border-slate-600/30">
+                        STANDBY
+                    </span>
+                {% endif %}
+            </div>
+            
+            <!-- Icon Washer Besar -->
+            <div class="flex justify-center mb-4">
+                <div class="w-16 h-16 rounded-full bg-blue-500/20 flex items-center justify-center border-2 border-blue-500/30
+                    {% if display_status == 'running' %}animate-pulse shadow-lg shadow-blue-500/30{% endif %}">
+                    <i class="fas fa-water text-2xl text-blue-400"></i>
+                </div>
+            </div>
+            
+            <div class="space-y-2 text-sm mb-4 p-3 bg-slate-800/30 rounded-lg">
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Threshold Arus:</span>
+                    <span class="text-white font-medium">{{ machine.amp_threshold }} A</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Auto Stop:</span>
+                    <span class="text-white font-medium">{{ machine.auto_stop_seconds }}s</span>
+                </div>
+                {# Debug: tampilkan status asli jika berbeda #}
+                {% if raw_status != display_status %}
+                <div class="flex justify-between text-xs">
+                    <span class="text-slate-500">Status Asli:</span>
+                    <span class="text-amber-400/70">{{ raw_status or 'None' }} → {{ display_status }}</span>
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="flex gap-2">
+                {% if current_user.has_permission('edit_machine') %}
+                <a href="{{ url_for('machine_edit', id=machine.id) }}" class="flex-1 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-center text-sm transition flex items-center justify-center gap-2">
+                    <i class="fas fa-edit"></i> Edit
+                </a>
+                {% endif %}
+                {% if current_user.is_admin() %}
+                <form method="POST" action="{{ url_for('machine_delete', id=machine.id) }}" class="flex-1" onsubmit="return confirm('Yakin hapus mesin ini?')">
+                    <button type="submit" class="w-full py-2 bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded-lg text-sm transition flex items-center justify-center gap-2">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="col-span-full py-12 text-center text-slate-500 border-2 border-dashed border-slate-700 rounded-xl">
+            <i class="fas fa-water text-4xl mb-3 block text-blue-400/50"></i>
+            <p>Belum ada mesin washer</p>
+            <a href="{{ url_for('machine_create') }}" class="mt-2 inline-block text-sm text-blue-400 hover:underline">Tambah washer pertama</a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Summary Footer -->
+<div class="mt-8 p-4 bg-slate-800/30 rounded-xl border border-slate-700">
+    <div class="flex flex-wrap gap-6 text-sm">
+        <div class="flex items-center gap-2">
+            <i class="fas fa-wind text-orange-400"></i>
+            <span class="text-slate-400">Total Dryer:</span>
+            <span class="font-bold text-white">{{ dryers|length }}</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <i class="fas fa-water text-blue-400"></i>
+            <span class="text-slate-400">Total Washer:</span>
+            <span class="font-bold text-white">{{ washers|length }}</span>
+        </div>
+        <div class="flex items-center gap-2 ml-auto">
+            <span class="text-slate-400">Total Mesin:</span>
+            <span class="font-bold text-indigo-400">{{ washers|length + dryers|length }}</span>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -16,6 +16,10 @@ export class UserRepository {
     return this.repo.update(id, updateData).then(() => {});
   }
 
+  findById(id: number): Promise<User | null> {
+    return this.repo.findOne({ where: { id } });
+  }
+
   findByUsername(username: string): Promise<User | null> {
     return this.repo.findOne({ where: { username } });
   }
