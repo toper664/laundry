@@ -1,6 +1,6 @@
 import { Session } from './session.ts';
 import { type IAmpReading, type ISessionSummary } from './session.types.ts';
-import { utcToJakarta, formatJakartaTime, nowJakarta, safeIsoformat, getTodayDate, jakartaToUtc } from '../../utils/tz.ts';
+import { utcToTz, formatTzTime, tzNow, safeIsoformat, getTodayDate, tzToUtc } from '../../utils/tz.ts';
 
 export class SessionService {
   durationSeconds(session: Session): number {
@@ -23,15 +23,15 @@ export class SessionService {
   }
 
   startTimeFormatted(session: Session): string {
-    return formatJakartaTime(session.startTime, 'HH:mm:ss');
+    return formatTzTime(session.startTime, 'HH:mm:ss');
   }
 
   startDateFormatted(session: Session): string {
-    return formatJakartaTime(session.startTime, 'dd MMM yyyy');
+    return formatTzTime(session.startTime, 'dd MMM yyyy');
   }
 
   endTimeFormatted(session: Session): string {
-    return formatJakartaTime(session.endTime, 'HH:mm:ss');
+    return formatTzTime(session.endTime, 'HH:mm:ss');
   }
 
   addAmpReading(session: Session, ampValue: number): void {
@@ -41,7 +41,7 @@ export class SessionService {
     } catch {
       history = [];
     }
-    history.push({ timestamp: safeIsoformat(nowJakarta()), amp: Math.round(ampValue * 100) / 100 });
+    history.push({ timestamp: safeIsoformat(tzNow()), amp: Math.round(ampValue * 100) / 100 });
     if (history.length > 100) history = history.slice(-100);
     session.ampHistory = JSON.stringify(history);
   }
@@ -54,15 +54,15 @@ export class SessionService {
     }
   }
 
-  getTotalRuntimeToday(deviceId: number, sessions: Session[]): number {
+  getTotalRuntimeToday(machineId: number, sessions: Session[]): number {
     const today = getTodayDate();
-    const utcStart = jakartaToUtc(today);
-    const utcEnd = jakartaToUtc(today.endOf('day'));
+    const utcStart = tzToUtc(today);
+    const utcEnd = tzToUtc(today.endOf('day'));
     if (!utcStart || !utcEnd) return 0;
 
     return sessions
       .filter(s =>
-        s.deviceId === deviceId &&
+        s.machineId === machineId &&
         s.status === 'completed' &&
         s.startTime >= utcStart &&
         s.startTime <= utcEnd
@@ -70,13 +70,13 @@ export class SessionService {
       .reduce((sum, s) => sum + (this.durationSeconds(s) ?? 0), 0);
   }
 
-  toDict(session: Session, deviceName: string = '-'): ISessionSummary {
-    const startJakarta = utcToJakarta(session.startTime);
-    const endJakarta = utcToJakarta(session.endTime);
+  toDict(session: Session, machineName: string = '-'): ISessionSummary {
+    const startJakarta = utcToTz(session.startTime);
+    const endJakarta = utcToTz(session.endTime);
     return {
       id: session.id,
-      device_id: session.deviceId,
-      device_name: deviceName,
+      machine_id: session.machineId,
+      machine_name: machineName,
       start_time: this.startTimeFormatted(session),
       start_date: this.startDateFormatted(session),
       start_full: safeIsoformat(startJakarta),

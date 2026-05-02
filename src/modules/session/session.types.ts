@@ -8,9 +8,9 @@ export interface IAmpReading {
 
 export interface ILaundrySession {
   id: number;
-  deviceId: number;
+  machineId: number;
   startTime: Date;
-  endTime?: Date;
+  endTime?: Date | null;
   targetStatus: PowerStatus;
   actualStatus: PowerStatus;
   currentAmp: number;
@@ -21,8 +21,8 @@ export interface ILaundrySession {
 
 export interface ISessionSummary {
   id: number;
-  device_id: number;
-  device_name: string;
+  machine_id: number;
+  machine_name: string;
   start_time: string;
   start_date: string;
   start_full: string | null;

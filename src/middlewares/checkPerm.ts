@@ -1,26 +1,39 @@
-import { type Request, type Response, type NextFunction } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import { AppDataSource } from '../config/database.ts';
-import { User } from '../modules/user/user.ts';
+import { UserRepository } from '../modules/user/user.queries.ts';
+import { DeviceRepository } from '../modules/device/device.queries.ts';
 
-const userRepository = AppDataSource.getRepository(User);
+const urepo = new UserRepository(AppDataSource);
+const drepo = new DeviceRepository(AppDataSource);
 
-interface AuthRequest extends Request {
-  user?: {
-    userId: number;
-    username: string;
-  };
-}
-
-export const hasRole = (requiredRole: string) => {
-  return async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      if (!req.user) {
+export const hasType = (requiredType: string) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try{
+      if (!res.locals.auth) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
-      const user = await userRepository.findOneBy({
-        id: req.user.userId,
-      });
+      if (res.locals.id.type !== requiredType) {
+        return res
+          .status(403)
+          .json({ error: `Forbidden: Requires ${requiredType} type` });
+      }
+
+      return next();
+    } catch (err) {
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  };
+};
+
+export const hasRole = (requiredRole: string) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!res.locals.auth) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const user = await urepo.findById(res.locals.id.sub);
 
       if (!user || user.role !== requiredRole) {
         return res
@@ -36,17 +49,15 @@ export const hasRole = (requiredRole: string) => {
 };
 
 export const hasPerm = (requiredPerm: string) => {
-  return async (req: AuthRequest, res: Response, next: NextFunction) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!req.user) {
+      if (!res.locals.auth) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
-      const user = await userRepository.findOneBy({
-        id: req.user.userId,
-      });
+      const device = await drepo.findByUuid(res.locals.id.sub);
 
-      if (!user || !user.permissions.includes(requiredPerm)) {
+      if (!device || !device.permissions.includes(requiredPerm)) {
         return res
           .status(403)
           .json({ error: `Forbidden: Requires ${requiredPerm} permission` });

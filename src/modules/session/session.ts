@@ -11,13 +11,13 @@ export class Session {
   id!: number;
 
   @Column({ type: 'integer' })
-  deviceId!: number;
+  machineId!: number;
 
   @CreateDateColumn()
   startTime!: Date;
 
   @Column({ nullable: true, type: 'datetime' })
-  endTime?: Date;
+  endTime?: Date | null;
 
   @Column({ type: 'varchar', default: 'OFF', length: 20 })
   targetStatus!: string;

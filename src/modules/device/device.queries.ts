@@ -16,8 +16,12 @@ export class DeviceRepository {
     return this.repo.find();
   }
 
-  findById(id: number): Promise<Device | null> {
-    return this.repo.findOne({ where: { id } });
+  findByUuid(uuid: string): Promise<Device | null> {
+    return this.repo.findOne({ where: { uuid } });
+  }
+
+  findByDeviceId(deviceId: string): Promise<Device | null> {
+    return this.repo.findOne({ where: { deviceId } });
   }
 
   findByType(deviceType: string): Promise<Device[]> {
@@ -34,9 +38,13 @@ export class DeviceRepository {
 
   countByStatuses(statuses: string[]): Promise<number> {
     return this.repo
-      .createQueryBuilder('m')
-      .where('m.status IN (:...statuses)', { statuses })
+      .createQueryBuilder('d')
+      .where('d.status IN (:...statuses)', { statuses })
       .getCount();
+  }
+
+  update(uuid: string, updateData: Partial<Device>): Promise<void> {
+    return this.repo.update(uuid, updateData).then(() => {});
   }
 
   save(Device: Device): Promise<Device> {

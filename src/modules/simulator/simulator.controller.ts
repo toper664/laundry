@@ -1,16 +1,16 @@
 import type { Request, Response } from 'express';
 import axios from 'axios';
 import { config } from '../../config/conf.ts';
-import { DeviceRepository } from '../device/device.queries.ts';
+import { MachineRepository } from '../machine/machine.queries.ts';
 import { SessionRepository } from '../session/session.queries.ts';
 import { SessionService } from '../session/session.services.ts';
 import { NotifRepository } from '../notif/notif.queries.ts';
 import { AppDataSource } from '../../config/database.ts';
-import { formatJakartaTime } from '../../utils/tz.ts';
+import { formatTzTime } from '../../utils/tz.ts';
 
 export const manualSim = async (req: Request, res: Response): Promise<Response> => {
   const { machine_id, action, duration } = req.body;
-  const machineRepo = new DeviceRepository(AppDataSource);
+  const machineRepo = new MachineRepository(AppDataSource);
   const sessionRepo = new SessionRepository(AppDataSource);
   const notifRepo = new NotifRepository(AppDataSource);
   const ss = new SessionService();
@@ -18,13 +18,13 @@ export const manualSim = async (req: Request, res: Response): Promise<Response> 
   const machine = await machineRepo.findById(machine_id);
   if (!machine) return res.status(404).json({ error: 'Machine not found' });
 
-  const existingSession = await sessionRepo.findRunningByDevice(machine_id);
+  const existingSession = await sessionRepo.findRunningByMachine(machine_id);
 
   if (action === 'START') {
     if (existingSession) return res.json({ success: false, message: 'Machine already running' });
 
     const session = sessionRepo.create({
-      deviceId: machine_id, status: 'running', actualStatus: 'ON', targetStatus: 'ON',
+      machineId: machine_id, status: 'running', actualStatus: 'ON', targetStatus: 'ON',
       currentAmp: machine.ampThreshold + 1.0, maxAmp: machine.ampThreshold + 1.0,
       startTime: new Date(),
     });
@@ -46,7 +46,7 @@ export const manualSim = async (req: Request, res: Response): Promise<Response> 
         success: true,
         message: `${machine.name} started`,
         session_id: session.id,
-        start_time_jakarta: formatJakartaTime(session.startTime) });
+        start_time_jakarta: formatTzTime(session.startTime) });
   }
 
   if (action === 'STOP') {
@@ -77,13 +77,13 @@ export const manualSim = async (req: Request, res: Response): Promise<Response> 
 };
 
 export const autoSim = async (req: Request, res: Response): Promise<Response> => {
-  const machineRepo = new DeviceRepository(AppDataSource);
+  const machineRepo = new MachineRepository(AppDataSource);
   const machines = await machineRepo.findAll();
   const sessionRepo = new SessionRepository(AppDataSource);
   const results: string[] = [];
 
   for (const machine of machines) {
-    const isRunning = await sessionRepo.findRunningByDevice(machine.id);
+    const isRunning = await sessionRepo.findRunningByMachine(machine.id);
     if (!isRunning && Math.random() > 0.7) {
       try {
         await axios.post(`http://${config.IP_ADDR}:${config.PORT}/simulator/control`, { machine_id: machine.id, action: 'START' });

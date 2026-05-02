@@ -10,20 +10,7 @@ export class UserService {
     return bcrypt.compare(password, user.password);
   }
 
-  getPermissions(user: User): string[] {
-    try {
-      return JSON.parse(user.permissions);
-    } catch {
-      return [];
-    }
-  }
-
-  hasPermission(user: User, permission: string): boolean {
-    const perms = this.getPermissions(user);
-    return perms.includes('all') || perms.includes(permission) || user.role === 'admin';
-  }
-
   isAdmin(user: User): boolean {
-    return user.role === 'admin' || this.getPermissions(user).includes('all');
+    return user.role === 'admin';
   }
 }

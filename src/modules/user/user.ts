@@ -20,9 +20,6 @@ export class User {
   @Column({ type: 'varchar', default: 'operator', length: 20 })
   role!: string;
 
-  @Column({ type: 'text', default: '[]' })
-  permissions!: string;
-
   @Column({ type: 'boolean', default: true })
   isActiveUser!: boolean;
 
@@ -34,9 +31,6 @@ export class User {
 
   @UpdateDateColumn()
   updatedAt!: Date;
-
-  @Column({ type: 'datetime', nullable: true })
-  lastLogin?: Date;
 
   @Column({ type: 'varchar', nullable: true })
   refreshToken?: string | null;

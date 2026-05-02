@@ -1,13 +1,13 @@
 import { Notif } from './notif.ts';
-import { utcToJakarta, formatJakartaTime, safeIsoformat } from '../../utils/tz.ts';
+import { utcToTz, formatTzTime, safeIsoformat } from '../../utils/tz.ts';
 
 export class NotifService {
   createdAtJakarta(notif: Notif): string {
-    return formatJakartaTime(notif.createdAt, 'HH:mm:ss');
+    return formatTzTime(notif.createdAt, 'HH:mm:ss');
   }
 
   toDict(notif: Notif): object {
-    const jakartaTime = utcToJakarta(notif.createdAt);
+    const jakartaTime = utcToTz(notif.createdAt);
     return {
       id: notif.id,
       device_id: notif.deviceId,

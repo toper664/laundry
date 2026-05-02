@@ -16,16 +16,16 @@ export class SessionRepository {
     return this.repo.findOne({ where: { id } });
   }
 
-  findRunningByDevice(deviceId: number): Promise<Session | null> {
-    return this.repo.findOne({ where: { deviceId, status: 'running' } });
+  findRunningByMachine(machineId: number): Promise<Session | null> {
+    return this.repo.findOne({ where: { machineId, status: 'running' } });
   }
 
-  findLatestByDevice(deviceId: number): Promise<Session | null> {
-    return this.repo.findOne({ where: { deviceId }, order: { startTime: 'DESC' } });
+  findLatestByMachine(machineId: number): Promise<Session | null> {
+    return this.repo.findOne({ where: { machineId }, order: { startTime: 'DESC' } });
   }
 
-  findByDevice(deviceId: number): Promise<Session[]> {
-    return this.repo.find({ where: { deviceId }, order: { startTime: 'DESC' } });
+  findByMachine(machineId: number): Promise<Session[]> {
+    return this.repo.find({ where: { machineId }, order: { startTime: 'DESC' } });
   }
 
   findByDateRange(utcStart: Date, utcEnd: Date): Promise<Session[]> {

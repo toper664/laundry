@@ -1,37 +1,36 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   Column,
   CreateDateColumn,
-  UpdateDateColumn
 } from 'typeorm';
 
 @Entity('devices')
 export class Device {
-  @PrimaryGeneratedColumn()
-  id!: number;
-
-  @Column({ type: 'varchar', length: 100 })
-  name!: string;
+  @PrimaryColumn({ type: 'uuid', length: 50 })
+  uuid!: string;
 
   @Column({ type: 'varchar', length: 20 })
+  deviceId!: string;
+
+  @Column({ type: 'varchar', length: 100 })
+  devKey!: string;
+
+  @Column({ default: 'esp32', type: 'varchar', length: 20 })
   deviceType!: string;
 
+  @Column({ type: 'text', default: '[]' })
+  permissions!: string;
+
   @Column({ nullable: true, type: 'varchar', length: 100 })
-  location?: string;
+  location?: string | null;
 
-  @Column({ default: 'standby', type: 'varchar', length: 20 })
+  @Column({ default: 'online', type: 'varchar', length: 10 })
   status!: string;
-
-  @Column({ type: 'float', default: 0.5 })
-  ampThreshold!: number;
-
-  @Column({ type: 'integer', default: 5 })
-  autoStopSeconds!: number;
 
   @CreateDateColumn()
   createdAt!: Date;
 
-  @UpdateDateColumn()
-  updatedAt!: Date;
+  @Column({ type: 'varchar', nullable: true })
+  refreshToken?: string | null;
 }

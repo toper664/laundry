@@ -1,33 +1,33 @@
 import { DateTime } from 'luxon';
 import { config } from '../config/conf.ts';
 
-export function nowJakarta(): DateTime {
-  return DateTime.now().setZone(config.TIMEZONE);
+export function tzNow(): DateTime {
+  return DateTime.now().setZone(config.TIMEZONE).set({ millisecond: 0 });
 }
 
-export function utcToJakarta(utcDt: Date | null | undefined): DateTime | null {
+export function utcToTz(utcDt: Date | null | undefined): DateTime | null {
   if (!utcDt) return null;
-  return DateTime.fromJSDate(utcDt, { zone: 'utc' }).setZone(config.TIMEZONE);
+  return DateTime.fromJSDate(utcDt, { zone: 'utc' }).setZone(config.TIMEZONE).set({ millisecond: 0 });
 }
 
-export function jakartaToUtc(jakartaDt: DateTime | null | undefined): Date | null {
-  if (!jakartaDt) return null;
-  return jakartaDt.toUTC().toJSDate();
+export function tzToUtc(tzDt: DateTime | null | undefined): Date | null {
+  if (!tzDt) return null;
+  return tzDt.set({ millisecond: 0 }).toUTC().toJSDate();
 }
 
-export function formatJakartaTime(utcDt: Date | null | undefined, format: string = 'HH:mm:ss'): string {
+export function formatTzTime(utcDt: Date | null | undefined, format: string = 'HH:mm:ss'): string {
   if (!utcDt) return '-';
-  const jakarta = utcToJakarta(utcDt);
-  if (!jakarta) return '-';
-  return jakarta.toFormat(format);
+  const tz = utcToTz(utcDt);
+  if (!tz) return '-';
+  return tz.set({ millisecond: 0 }).toFormat(format);
 }
 
 export function getTodayDate(): DateTime {
-  return nowJakarta().startOf('day');
+  return tzNow().startOf('day');
 }
 
 export function safeIsoformat(dt: Date | DateTime | null | undefined): string | null {
   if (!dt) return null;
   if (dt instanceof Date) return dt.toISOString();
-  return (dt as DateTime).toISO();
+  return (dt as DateTime).set({ millisecond: 0 }).toISO({ suppressMilliseconds: true });
 }

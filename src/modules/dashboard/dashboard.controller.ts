@@ -1,11 +1,11 @@
 import type { Request, Response } from 'express';
-import { DeviceRepository } from '../device/device.queries.ts';
+import { MachineRepository } from '../machine/machine.queries.ts';
 import { AppDataSource } from '../../config/database.ts';
 import { SessionRepository } from '../session/session.queries.ts';
-import { getTodayDate, jakartaToUtc } from '../../utils/tz.ts';
+import { getTodayDate, tzToUtc } from '../../utils/tz.ts';
 
 export const getDashboard = async (req: Request, res: Response) => {
-  const machineRepo = new DeviceRepository(AppDataSource);
+  const machineRepo = new MachineRepository(AppDataSource);
   const sessionRepo = new SessionRepository(AppDataSource);
 
   const totalMachines = await machineRepo.countByStatuses(['online', 'offline', 'standby', 'running']);
@@ -13,8 +13,8 @@ export const getDashboard = async (req: Request, res: Response) => {
   const runningMachines = await machineRepo.countByStatus('running');
 
   const today = getTodayDate();
-  const utcStart = jakartaToUtc(today)!;
-  const utcEnd = jakartaToUtc(today.endOf('day'))!;
+  const utcStart = tzToUtc(today)!;
+  const utcEnd = tzToUtc(today.endOf('day'))!;
 
   const todaySessions = await sessionRepo.countByDateRange(utcStart, utcEnd);
 
@@ -22,11 +22,11 @@ export const getDashboard = async (req: Request, res: Response) => {
   const machineData = await Promise.all(machines.map(async m => {
     let currentStatus = m.status || 'standby';
     if (['offline', ''].includes(currentStatus)) currentStatus = 'standby';
-    const latestSession = await sessionRepo.findLatestByDevice(m.id);
+    const latestSession = await sessionRepo.findLatestByMachine(m.id);
     return {
       id: m.id,
       name: m.name,
-      type: m.deviceType,
+      type: m.machineType,
       status: currentStatus,
       current_amp: latestSession?.currentAmp ?? 0,
       target_status: latestSession?.targetStatus ?? 'OFF',

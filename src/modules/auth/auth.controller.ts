@@ -1,16 +1,17 @@
 import { type Request, type Response } from 'express';
 import bcrypt from 'bcrypt';
-import { z } from 'zod';
-import { verifyRefreshToken, generateAccessToken, generateRefreshToken, hashToken } from '../../utils/jwt.ts';
+import { verifyRefreshToken,
+         generateAccessToken,
+         generateRefreshToken,
+         hashToken,
+         REFRESH_TTL_SECS, } from '../../utils/jwt.ts';
 import { AppDataSource } from '../../config/database.ts';
 import { UserRepository } from '../user/user.queries.ts';
-import { REFRESH_TTL_SECS } from '../../utils/jwt.ts';
-import { loginSchema } from './auth.schema.ts';
+import { type UserInfo } from '../../middlewares/check.schema.ts';
+import { type LoginBody, loginSchema } from './auth.schema.ts';
 
 const repo = new UserRepository(AppDataSource);
 const SALT_ROUNDS = 12;
-
-type LoginBody = z.infer<typeof loginSchema>;
 
 export const register = async (
   req: Request<{}, {}, LoginBody>,
@@ -26,6 +27,10 @@ export const register = async (
       });
     }
 
+    if (await repo.findByUsername(result.data.username)) {
+      return res.status(409).json({ error: 'Username already exists' });
+    }
+
     const { username, password } = result.data;
 
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
@@ -36,9 +41,10 @@ export const register = async (
     });
 
     const payload = {
-      userId: user.id,
+      type: 'user',
+      sub: user.id,
       username: user.username,
-    };
+    } as UserInfo;
 
     const accessToken = generateAccessToken(payload);
     const refreshToken = generateRefreshToken(payload);
@@ -51,16 +57,13 @@ export const register = async (
       secure: true,
       sameSite: 'strict',
       maxAge: REFRESH_TTL_SECS * 1000
-    }).cookie('accessToken', accessToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'strict'
     }).json({
       success: true,
+      token: accessToken,
       user: {
         id: user.id,
         username: user.username,
-      },
+      }
     });
   } catch (err: any) {
     return res.status(500).json({
@@ -99,27 +102,28 @@ export const login = async (
     }
 
     const payload = {
-      userId: user.id,
+      type: 'user',
+      sub: user.id,
       username: user.username,
-    };
+    } as UserInfo;
 
     const accessToken = generateAccessToken(payload);
     const refreshToken = generateRefreshToken(payload);
 
-    repo.update(payload.userId, { refreshToken: hashToken(refreshToken) });
+    repo.update(payload.sub, { isActiveUser: true, refreshToken: hashToken(refreshToken) });
 
-    return res.cookie('refreshToken', refreshToken, {
+    return res.status(200).cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: true,
       sameSite: 'strict',
       maxAge: REFRESH_TTL_SECS * 1000
-    }).cookie('accessToken', accessToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'strict'
     }).json({
       success: true,
-      user: payload,
+      token: accessToken,
+      user: {
+        id: user.id,
+        username: user.username,
+      }
   });
   } catch (err: any) {
     return res.status(500).json({
@@ -134,45 +138,41 @@ export const refresh = async (req: Request, res: Response) => {
     const refreshToken = req.cookies.refreshToken;
 
     if (!refreshToken) {
-      return res.status(401).json({ error: 'Refresh token required' });
+      return res.status(400).json({ error: 'Refresh token required' });
     }
 
-    const payload = verifyRefreshToken(refreshToken);
-    if (!payload) {
+    const decoded = verifyRefreshToken(refreshToken) as UserInfo;
+    if (!decoded) {
       return res.status(401).json({ error: 'Invalid refresh token' });
     }
 
-    const user = await repo.findById(payload.userId);
+    const payload = {
+      type: 'user',
+      sub: decoded.sub,
+      username: decoded.username,
+    } as UserInfo;
+
+    const user = await repo.findById(payload.sub);
     if (!user || user.refreshToken !== hashToken(refreshToken)) {
-      return res.status(401).json({ error: 'Unrecognized refresh token' });
+      return res.status(403).json({ error: 'Unrecognized refresh token' });
     }
 
-    const newAccessToken = generateAccessToken({
-      userId: payload.userId,
-      username: payload.username,
-    });
+    const newAccessToken = generateAccessToken(payload);
+    const newRefreshToken = generateRefreshToken(payload);
 
-    const newRefreshToken = generateRefreshToken({
-      userId: payload.userId,
-      username: payload.username,
-    });
-
-    await repo.update(payload.userId, { refreshToken: hashToken(newRefreshToken) });
+    await repo.update(payload.sub, { refreshToken: hashToken(newRefreshToken) });
 
     return res.cookie('refreshToken', newRefreshToken, {
       httpOnly: true,
       secure: true,
       sameSite: 'strict',
       maxAge: REFRESH_TTL_SECS * 1000
-    }).cookie('accessToken', newAccessToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'strict'
     }).json({
       success: true,
+      token: newAccessToken,
     });
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid or expired refresh token' });
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message || 'Invalid refresh token' });
   }
 };
 
@@ -181,13 +181,19 @@ export const logout = async (req: Request, res: Response) => {
     const refreshToken = req.cookies.refreshToken;
 
     if (refreshToken) {
-      const user = await repo.findByRefreshToken(refreshToken);
-      if (user) {
-        await repo.update(user.id, { refreshToken: null });
+      const user = await repo.findByRefreshToken(hashToken(refreshToken));
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
       }
-      else {
-        return res.status(401).json({ error: 'Invalid refresh token' });
+
+      await repo.update(user.id, { isActiveUser: false, refreshToken: null });
+
+      if (user.refreshToken === null || !user.isActiveUser) {
+        return res.status(403).json({ error: 'User already logged out' });
       }
+    }
+    else {
+      return res.status(400).json({ error: 'Refresh token required' });
     }
     return res.status(200).clearCookie('refreshToken').json({ message: 'Logged out' });
   } catch (err) {
