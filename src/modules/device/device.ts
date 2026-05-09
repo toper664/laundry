@@ -13,9 +13,6 @@ export class Device {
   @Column({ type: 'varchar', length: 20 })
   deviceId!: string;
 
-  @Column({ type: 'varchar', length: 100 })
-  devKey!: string;
-
   @Column({ default: 'esp32', type: 'varchar', length: 20 })
   deviceType!: string;
 

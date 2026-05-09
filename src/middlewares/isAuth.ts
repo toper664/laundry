@@ -1,6 +1,6 @@
 import { type Request, type Response, type NextFunction } from 'express';
 import { verifyAccessToken } from '../utils/jwt.ts';
-import { userSchema } from './check.schema.ts';
+import { deviceSchema, userSchema } from './check.schema.ts';
 
 export const check = (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization || '';
@@ -22,12 +22,25 @@ export const check = (req: Request, res: Response, next: NextFunction) => {
     return res.status(401).json({ message: msg });
   }
 
-  const payload = userSchema.safeParse(decoded);
-  if (!payload.success) {
-    return res.status(400).json({
-      error: 'Invalid token payload',
-      details: payload.error.flatten(),
-    });
+  let payload;
+  if (decoded.type == 'user') {
+    payload = userSchema.safeParse(decoded);
+    if (!payload.success) {
+      return res.status(400).json({
+        error: 'Invalid token payload',
+        details: payload.error.flatten(),
+      });
+    }
+  } else if (decoded.type == 'device') {  
+    payload = deviceSchema.safeParse(decoded);
+    if (!payload.success) {
+      return res.status(400).json({
+        error: 'Invalid token payload',
+        details: payload.error.flatten(),
+      });
+    }
+  } else {
+    return res.status(400).json({ error: 'Invalid token type' });
   }
 
   res.locals.auth = payload.success;

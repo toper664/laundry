@@ -22,8 +22,7 @@ export const bootstrapDeviceSchema = z.object({
 });
 
 export const loginDeviceSchema = z.object({
-  device_id: z.string().min(3),
-  dev_key: z.string().min(6),
+  uuid: z.string().min(3),
   wifi_info: z.object({
     ssid: z.string().min(1),
     bssid: z.string().min(12),

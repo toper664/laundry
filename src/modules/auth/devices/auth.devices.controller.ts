@@ -16,7 +16,6 @@ import { type DeviceInfo } from '../../../middlewares/check.schema.ts';
 const mrepo = new MachineRepository(AppDataSource);
 const drepo = new DeviceRepository(AppDataSource);
 const wrepo = new WifiRepository(AppDataSource);
-const SALT_ROUNDS = 12;
 
 export const bootstrap = async (
   req: Request<{}, {}, BootstrapDeviceBody>,
@@ -60,7 +59,6 @@ export const bootstrap = async (
       }
 
       const uuid = uuidv7();
-      const hashedKey = await bcrypt.hash(uuid+device_id, SALT_ROUNDS);
   
       const merr = await createMachine(machines, uuid);
       if (merr instanceof Error) {
@@ -70,7 +68,6 @@ export const bootstrap = async (
       const device = drepo.create({
         uuid: uuid,
         deviceId: device_id,
-        devKey: hashedKey,
         deviceType: device_type,
         location: location ? location : null,
       });
@@ -93,11 +90,9 @@ export const bootstrap = async (
   
       return res.status(201).json({
         success: true,
-        id: device.uuid,
-        name: device.deviceId,
-        hash: device.devKey,
-        token: accessToken,
-        refreshToken: refreshToken,
+        uuid: device.uuid,
+        access_token: accessToken,
+        refresh_token: refreshToken,
       });
     } catch (err: any) {
       return res.status(500).json({
@@ -120,8 +115,7 @@ export const reauth = async (
       });
     }
     
-    const { device_id, dev_key, wifi_info } = result.data;
-    //device_id is uuid, dev_key is hashed key
+    const { uuid, wifi_info } = result.data;
     
     const wifi = await wrepo.findByBssid(wifi_info.bssid);
 
@@ -129,13 +123,13 @@ export const reauth = async (
       return res.status(409).json({ error: 'WiFi not recognized' });
     }
 
-    const device = await drepo.findByUuid(device_id);
+    const device = await drepo.findByUuid(uuid);
 
     if (!device) {
       return res.status(401).json({ error: 'Device not found' });
     }
 
-    const isMatch = dev_key === device.devKey;
+    const isMatch = uuid === device.uuid && JSON.parse(wifi.relatedDevices).includes(device.uuid);
 
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid credentials' });
@@ -154,10 +148,9 @@ export const reauth = async (
 
     return res.status(200).json({
       success: true,
-      id: device.uuid,
-      name: device.deviceId,
-      token: accessToken,
-      refreshToken: refreshToken,
+      uuid: device.uuid,
+      access_token: accessToken,
+      refresh_token: refreshToken,
     });
   } catch (err: any) {
     return res.status(500).json({
@@ -169,7 +162,7 @@ export const reauth = async (
 
 export const refresh = async (req: Request, res: Response) => {
   try {
-    const refreshToken = req.body.refreshToken;
+    const refreshToken = req.body.refresh_token;
 
     if (!refreshToken) {
       return res.status(401).json({ error: 'Refresh token required' });
@@ -198,8 +191,8 @@ export const refresh = async (req: Request, res: Response) => {
 
     return res.json({
       success: true,
-      token: newAccessToken,
-      refreshToken: newRefreshToken,
+      access_token: newAccessToken,
+      refresh_token: newRefreshToken,
     });
   } catch (err) {
     return res.status(400).json({ error: 'Invalid or expired refresh token' });
