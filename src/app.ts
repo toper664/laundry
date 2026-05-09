@@ -58,7 +58,7 @@ app.use('/users', adminCheck, userRoutes);
 app.use('/wifi', adminCheck, wifiRoutes);
 // app.use('/settings', settingsRoutes);
 // app.use('/profile', profileRoutes);
-app.use('/machines', hasType('device'), machineRoutes);
+app.use('/machines', hasType('user'), machineRoutes);
 
 app.use(
   (err: Error, req: Request, res: Response, next: NextFunction) => {
